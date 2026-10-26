@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GST Client &amp; Compliance Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<style>
+  :root{
+    --ink:#1B2A38;
+    --ink-soft:#2C3E50;
+    --paper:#FAFAF8;
+    --panel:#FFFFFF;
+    --line:#E3E1D9;
+    --slate:#5B6B76;
+    --slate-light:#8B98A1;
+    --green:#2F6F4F;
+    --green-bg:#E7F0EA;
+    --amber:#C97A2B;
+    --amber-bg:#FBEEDF;
+    --gold:#B8912B;
+    --gold-bg:#FBF3DC;
+    --brick:#B4442E;
+    --brick-bg:#FBE7E2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"IBM Plex Sans",Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    font-size:14px;
+  }
+  .mono{font-family:"IBM Plex Mono",monospace;}
+  #app{display:flex;min-height:100vh;}
+
+  #sidebar{
+    width:210px;
+    background:var(--ink);
+    color:#EDEEEA;
+    flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    padding:22px 0;
+  }
+  #sidebar .brand{
+    padding:0 20px 22px 20px;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+    margin-bottom:14px;
+  }
+  #sidebar .brand .mark{font-size:19px; font-weight:700; letter-spacing:0.2px;}
+  #sidebar .brand .sub{font-size:11px; color:#9FB0AE; margin-top:3px;}
+  .nav-item{
+    padding:11px 20px; cursor:pointer; font-size:13.5px; color:#C7CFCB;
+    border-left:3px solid transparent; display:flex; justify-content:space-between; align-items:center;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.05); color:#fff;}
+  .nav-item.active{background:rgba(255,255,255,0.07); color:#fff; border-left:3px solid var(--gold); font-weight:600;}
+  .nav-item .count{font-size:11px; background:rgba(255,255,255,0.12); padding:1px 7px; border-radius:9px; color:#EDEEEA;}
+  .sidebar-footer{margin-top:auto; padding:14px 20px 0 20px; border-top:1px solid rgba(255,255,255,0.12);}
+  .sidebar-footer .sf-link{font-size:12px; color:#9FB0AE; cursor:pointer; padding:6px 0;}
+  .sidebar-footer .sf-link:hover{color:#fff;}
+
+  #main{flex:1; min-width:0; padding:26px 30px 60px 30px;}
+  h1{font-size:20px; margin:0 0 3px 0; font-weight:700;}
+  .page-sub{color:var(--slate); font-size:13px; margin-bottom:20px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px 18px;}
+
+  .stat-row{display:flex; gap:14px; margin-bottom:22px; flex-wrap:wrap;}
+  .stat{flex:1; min-width:130px; background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--ink); border-radius:4px; padding:12px 14px;}
+  .stat .n{font-size:24px; font-weight:700; line-height:1;}
+  .stat .l{font-size:11.5px; color:var(--slate); margin-top:4px;}
+  .stat.completed{border-left-color:var(--green);}
+  .stat.documents{border-left-color:var(--gold);}
+  .stat.progress{border-left-color:var(--amber);}
+  .stat.followup{border-left-color:var(--brick);}
+
+  .section-title{font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; color:var(--slate); margin:26px 0 10px 0;}
+  .section-title:first-child{margin-top:0;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th{text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:0.3px; color:var(--slate); padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable:hover{background:#F5F4EF; cursor:pointer;}
+
+  .badge{display:inline-block; padding:2px 9px; border-radius:3px; font-size:11.5px; font-weight:600;}
+  .badge.completed{background:var(--green-bg); color:var(--green);}
+  .badge.documents{background:var(--gold-bg); color:var(--gold);}
+  .badge.in_progress{background:var(--amber-bg); color:var(--amber);}
+  .badge.follow_up{background:var(--brick-bg); color:var(--brick);}
+
+  .btn{background:var(--ink); color:#fff; border:none; padding:8px 15px; border-radius:4px; font-size:13px; cursor:pointer; font-weight:600;}
+  .btn:hover{background:var(--ink-soft);}
+  .btn.secondary{background:none; color:var(--ink); border:1px solid var(--line);}
+  .btn.secondary:hover{background:#F0EFE9;}
+  .btn.danger{background:none; color:var(--brick); border:1px solid var(--brick);}
+  .btn.small{padding:5px 10px; font-size:12px;}
+  .btn:disabled{opacity:0.45; cursor:not-allowed;}
+
+  .topbar{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:6px;}
+
+  input, select, textarea{font-family:inherit; font-size:13.5px; padding:7px 9px; border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--ink); width:100%;}
+  label{font-size:11.5px; color:var(--slate); font-weight:600; display:block; margin-bottom:4px;}
+  .field{margin-bottom:12px;}
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+
+  .modal-bg{position:fixed; inset:0; background:rgba(27,42,56,0.45); display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; z-index:50;}
+  .modal{background:#fff; border-radius:8px; width:100%; max-width:640px; padding:24px 26px;}
+  .modal h2{margin:0 0 4px 0; font-size:17px;}
+  .modal .close{float:right; cursor:pointer; color:var(--slate); font-size:20px; line-height:1;}
+
+  .checklist-item{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:13.5px;}
+  .checklist-item input[type=checkbox]{width:auto;}
+  .checklist-item.done label{text-decoration:line-through; color:var(--slate-light);}
+  .checklist-item label{margin:0; font-weight:400; color:var(--ink); font-size:13.5px;}
+
+  .followup-log{border-left:2px solid var(--line); padding-left:12px; margin-top:6px;}
+  .followup-entry{margin-bottom:10px; font-size:13px;}
+  .followup-entry .fd{color:var(--slate); font-size:11.5px;}
+
+  .empty{color:var(--slate-light); font-size:13px; padding:20px 0; text-align:center;}
+  .search-box{max-width:340px;}
+  .tag-row{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;}
+  .tag{padding:4px 11px; border-radius:14px; font-size:12px; border:1px solid var(--line); cursor:pointer; color:var(--slate); background:#fff;}
+  .tag.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+  #toast{position:fixed; bottom:20px; right:20px; background:var(--ink); color:#fff; padding:10px 18px; border-radius:5px; font-size:13px; opacity:0; transition:opacity 0.25s; pointer-events:none; z-index:100;}
+  #toast.show{opacity:1;}
+
+  #lock-screen{min-height:100vh; width:100%; display:flex; align-items:center; justify-content:center; background:var(--ink); padding:20px;}
+  .lock-card{background:#fff; border-radius:8px; padding:32px 30px; width:100%; max-width:380px;}
+  .lock-card h2{margin:0 0 4px 0; font-size:18px;}
+  .lock-card .page-sub{margin-bottom:20px;}
+  .lock-error{color:var(--brick); font-size:12.5px; margin:-6px 0 12px 0; min-height:16px;}
+  .lock-note{font-size:11.5px; color:var(--slate-light); margin-top:14px; text-align:center;}
+
+  .file-row{display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line);}
+  .file-row:last-child{border-bottom:none;}
+  .file-name{font-weight:600;}
+  .file-meta{font-size:12px; color:var(--slate);}
+  .dropzone{border:2px dashed var(--line); border-radius:6px; padding:26px; text-align:center; color:var(--slate); font-size:13px; cursor:pointer; background:#fff;}
+  .dropzone:hover{border-color:var(--slate-light);}
+  .dropzone.drag{border-color:var(--gold); background:var(--gold-bg);}
+
+  @media (max-width:780px){
+    #app{flex-direction:column;}
+    #sidebar{width:100%; flex-direction:row; overflow-x:auto; padding:10px 0;}
+    #sidebar .brand{display:none;}
+    #sidebar .sidebar-footer{display:none;}
+    .nav-item{white-space:nowrap; border-left:none; border-bottom:3px solid transparent;}
+    .nav-item.active{border-left:none; border-bottom:3px solid var(--gold);}
+    #main{padding:18px 14px 50px 14px;}
+    .field-row{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div id="lock-screen" style="display:none;"></div>
+
+<div id="app" style="display:none;">
+  <div id="sidebar">
+    <div class="brand">
+      <div class="mark">GST Manager</div>
+      <div class="sub">Client &amp; Compliance Tracker</div>
+    </div>
+    <div class="nav-item" data-tab="dashboard">Today's Work</div>
+    <div class="nav-item" data-tab="clients">Clients</div>
+    <div class="nav-item" data-tab="work">Work Tracker</div>
+    <div class="nav-item" data-tab="followups">Follow-ups <span class="count" id="fu-count"></span></div>
+    <div class="nav-item" data-tab="files">Files</div>
+    <div class="nav-item" data-tab="search">Search</div>
+    <div class="sidebar-footer">
+      <div class="sf-link" id="change-pw-link">Change password</div>
+      <div class="sf-link" id="lock-link">Lock now</div>
+    </div>
+  </div>
+  <div id="main"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* =====================================================================
+   ENCRYPTION LAYER — uses CryptoJS (pure JavaScript) rather than the
+   browser's native Web Crypto API, because Web Crypto is unavailable
+   inside this sandboxed artifact frame. Everything (clients, work
+   items, uploaded files) is stored as one encrypted blob under a
+   single key. The password is kept only in memory for the session —
+   it is never itself written to storage.
+===================================================================== */
+let sessionPassword = null;
+
+function encryptData(password, obj){
+  return CryptoJS.AES.encrypt(JSON.stringify(obj), password).toString();
+}
+function decryptData(password, cipherText){
+  const bytes = CryptoJS.AES.decrypt(cipherText, password);
+  const str = bytes.toString(CryptoJS.enc.Utf8);
+  if(!str) throw new Error('Incorrect password');
+  return JSON.parse(str);
+}
+
+/* ---------- state ---------- */
+let clients = [];
+let workItems = [];
+let files = [];
+let currentTab = 'dashboard';
+
+async function persist(){
+  try{
+    const cipherText = encryptData(sessionPassword, {clients, workItems, files});
+    const result = await window.storage.set('vault', cipherText, false);
+    if(!result) toast('Save failed — check your connection and try again');
+  }catch(e){
+    toast('Could not save: ' + (e && e.message ? e.message : 'unknown error'));
+  }
+}
+async function saveClients(){ await persist(); }
+async function saveWork(){ await persist(); }
+async function saveFiles(){ await persist(); }
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2400);
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtSize(bytes){ if(bytes<1024) return bytes+' B'; if(bytes<1024*1024) return (bytes/1024).toFixed(0)+' KB'; return (bytes/1024/1024).toFixed(1)+' MB'; }
+
+/* ---------- checklist templates ---------- */
+const CHECKLISTS = {
+  "New Registration": ["Check current registration status","Collect PAN, Aadhaar, photograph","Collect address proof (rent/lease, electricity bill, NOC)","Collect bank proof","Prepare authorization letter","Prepare application","Submit application","Save ARN","Track application","Follow up if required","Save registration certificate"],
+  "Additional Place of Business": ["Collect address proof for new place","Collect NOC/ownership proof","Prepare amendment application","Submit application","Save ARN","Track application","Save updated certificate"],
+  "Director Change": ["Check current GST registration","Check MCA/director change documents","Obtain required KYC","Obtain authorization","Prepare amendment","Upload documents","Submit application","Save ARN","Track application","Follow up if required","Save approval order/certificate"],
+  "Partner Change": ["Check current GST registration","Check partnership deed/change documents","Obtain required KYC","Obtain authorization","Prepare amendment","Upload documents","Submit application","Save ARN","Track application","Follow up if required","Save approval order/certificate"],
+  "Mobile Number": ["Verify current registered mobile","Obtain new number + OTP access","Update on portal","Save confirmation"],
+  "Email ID": ["Verify current registered email","Obtain new email + OTP access","Update on portal","Save confirmation"],
+  "Address": ["Collect new address proof","Prepare amendment application","Submit application","Save ARN","Track application","Save updated certificate"],
+  "Bank Details": ["Collect new bank proof/cancelled cheque","Update on portal","Submit","Save confirmation"],
+  "Business Activity": ["Confirm new activity/HSN-SAC codes","Prepare amendment application","Submit application","Save ARN","Track application"],
+  "Other Registration Details": ["Identify field to be amended","Collect supporting document","Prepare amendment application","Submit application","Save ARN","Track application"],
+  "Cancellation": ["Check reason for cancellation","Prepare final return details","Prepare cancellation application","Submit application","Save ARN","Track application","Save cancellation order"],
+  "Revocation": ["Check reason for original cancellation","Prepare revocation application","Submit application","Save ARN","Track application","Save revocation order"],
+  "GSTR-1": ["Collect sales data","Reconcile with books","Prepare return","File return","Save acknowledgment"],
+  "GSTR-3B": ["Collect sales & purchase data","Reconcile ITC","Prepare return","File return","Save acknowledgment"],
+  "GSTR-9": ["Collect annual data","Reconcile with GSTR-1/3B","Prepare annual return","File return","Save acknowledgment"],
+  "GSTR-9C": ["Collect audited financials","Reconcile with GSTR-9","Prepare reconciliation statement","File return","Save acknowledgment"],
+  "CMP-08": ["Collect quarterly turnover data","Compute tax payable","File statement","Save acknowledgment"],
+  "GSTR-4": ["Collect annual composition data","Prepare return","File return","Save acknowledgment"],
+  "LUT": ["Check eligibility","Prepare LUT application","Submit application","Save ARN","Save LUT certificate"],
+  "Refund": ["Check refund eligibility & category","Prepare refund application with supporting docs","Submit application","Save ARN","Track application","Follow up if required","Save refund order"],
+  "Notice": ["Review notice carefully","Identify department/officer","Prepare reply/documents","Submit reply","Track status","Follow up if required","Save order/closure"],
+  "14A": ["Review 14A notice","Prepare clarification & documents","Submit clarification","Track status","Follow up if required","Save order"],
+  "Registration Clarification": ["Review clarification notice","Prepare requested documents","Submit clarification","Track status","Follow up if required","Save order"],
+  "Officer Follow-up": ["Note officer/department contact","Call/email officer","Record response","Set next follow-up date","Save resolution"]
+};
+const WORK_CATEGORIES = {
+  "Registration": ["New Registration","Additional Place of Business"],
+  "Amendment": ["Director Change","Partner Change","Mobile Number","Email ID","Address","Bank Details","Business Activity","Other Registration Details"],
+  "Cancellation/Revocation": ["Cancellation","Revocation"],
+  "Returns": ["GSTR-1","GSTR-3B","GSTR-9","GSTR-9C","CMP-08","GSTR-4"],
+  "Other GST Work": ["LUT","Refund","Notice","14A","Registration Clarification","Officer Follow-up"]
+};
+const STATUS_LABEL = {documents:"Documents Pending", in_progress:"In Progress", follow_up:"Follow-up", completed:"Completed"};
+
+/* =====================================================================
+   LOCK SCREEN
+===================================================================== */
+async function boot(){
+  const lockEl = document.getElementById('lock-screen');
+  const appEl = document.getElementById('app');
+  lockEl.style.display = 'flex';
+  appEl.style.display = 'none';
+
+  if(typeof CryptoJS === 'undefined'){
+    lockEl.innerHTML = `<div class="lock-card"><h2>Couldn't load</h2><div class="page-sub">A required library failed to load. Check your internet connection and reload this page.</div></div>`;
+    return;
+  }
+
+  let existingVault = null;
+  try{
+    const v = await window.storage.get('vault', false);
+    existingVault = v ? v.value : null;
+  }catch(e){
+    existingVault = null;
+  }
+
+  if(!existingVault){
+    renderCreatePassword(lockEl, appEl);
+  } else {
+    renderUnlock(lockEl, appEl, existingVault);
+  }
+}
+
+function renderCreatePassword(lockEl, appEl){
+  lockEl.innerHTML = `
+    <div class="lock-card">
+      <h2>Set a password</h2>
+      <div class="page-sub">This protects your client data (GSTIN, PAN, contacts) on this device. There's no way to recover it if you forget it — write it down somewhere safe.</div>
+      <div class="field"><label>Password</label><input type="password" id="pw1" autofocus></div>
+      <div class="field"><label>Confirm password</label><input type="password" id="pw2"></div>
+      <div class="lock-error" id="pw-error"></div>
+      <button class="btn" id="create-pw-btn" style="width:100%;">Set Password &amp; Continue</button>
+    </div>
+  `;
+  const go = async ()=>{
+    const err = document.getElementById('pw-error');
+    const btn = document.getElementById('create-pw-btn');
+    try{
+      const p1 = document.getElementById('pw1').value;
+      const p2 = document.getElementById('pw2').value;
+      if(p1.length < 4){ err.textContent = 'Use at least 4 characters.'; return; }
+      if(p1 !== p2){ err.textContent = "Passwords don't match."; return; }
+      btn.disabled = true; btn.textContent = 'Setting up…';
+      sessionPassword = p1;
+      clients = []; workItems = []; files = [];
+      const cipherText = encryptData(sessionPassword, {clients, workItems, files});
+      const result = await window.storage.set('vault', cipherText, false);
+      if(!result) throw new Error('storage did not confirm the save');
+      lockEl.style.display = 'none';
+      appEl.style.display = 'flex';
+      currentTab = 'dashboard';
+      render();
+    }catch(e){
+      err.textContent = 'Something went wrong: ' + (e && e.message ? e.message : 'unknown error');
+      btn.disabled = false; btn.textContent = 'Set Password & Continue';
+    }
+  };
+  document.getElementById('create-pw-btn').addEventListener('click', go);
+  lockEl.querySelector('#pw2').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+}
+
+function renderUnlock(lockEl, appEl, vaultCipherText){
+  lockEl.innerHTML = `
+    <div class="lock-card">
+      <h2>Enter password</h2>
+      <div class="page-sub">Unlock your GST client data</div>
+      <div class="field"><label>Password</label><input type="password" id="unlock-pw" autofocus></div>
+      <div class="lock-error" id="unlock-error"></div>
+      <button class="btn" id="unlock-btn" style="width:100%;">Unlock</button>
+    </div>
+  `;
+  const go = async ()=>{
+    const err = document.getElementById('unlock-error');
+    err.textContent = '';
+    try{
+      const pw = document.getElementById('unlock-pw').value;
+      const parsed = decryptData(pw, vaultCipherText);
+      clients = parsed.clients || [];
+      workItems = parsed.workItems || [];
+      files = parsed.files || [];
+      sessionPassword = pw;
+      lockEl.style.display = 'none';
+      appEl.style.display = 'flex';
+      currentTab = 'dashboard';
+      render();
+    }catch(e){
+      err.textContent = 'Incorrect password.';
+    }
+  };
+  document.getElementById('unlock-btn').addEventListener('click', go);
+  lockEl.querySelector('#unlock-pw').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+}
+
+/* change password / lock */
+document.getElementById('change-pw-link').addEventListener('click', ()=>{
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:400px;">
+      <span class="close">&times;</span>
+      <h2>Change password</h2>
+      <div class="page-sub">Re-encrypts your data with a new password.</div>
+      <div class="field"><label>New password</label><input type="password" id="new-pw1"></div>
+      <div class="field"><label>Confirm new password</label><input type="password" id="new-pw2"></div>
+      <div class="lock-error" id="cpw-error"></div>
+      <button class="btn" id="save-new-pw" style="width:100%;">Save New Password</button>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('.close').addEventListener('click', ()=>bg.remove());
+  bg.querySelector('#save-new-pw').addEventListener('click', async ()=>{
+    const err = document.getElementById('cpw-error');
+    try{
+      const p1 = document.getElementById('new-pw1').value;
+      const p2 = document.getElementById('new-pw2').value;
+      if(p1.length < 4){ err.textContent='Use at least 4 characters.'; return; }
+      if(p1 !== p2){ err.textContent="Passwords don't match."; return; }
+      sessionPassword = p1;
+      await persist();
+      bg.remove();
+      toast('Password updated');
+    }catch(e){
+      err.textContent = 'Something went wrong: ' + (e && e.message ? e.message : 'unknown error');
+    }
+  });
+});
+document.getElementById('lock-link').addEventListener('click', ()=>{
+  sessionPassword = null;
+  clients = []; workItems = []; files = [];
+  document.getElementById('app').style.display = 'none';
+  boot();
+});
+
+/* ---------- nav ---------- */
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click', ()=>{ currentTab = el.dataset.tab; render(); });
+});
+
+/* ---------- render router ---------- */
+function render(){
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.tab===currentTab);
+  });
+  const dueFollowups = workItems.filter(w=>{
+    const lastFu = w.followups && w.followups.length ? w.followups[w.followups.length-1] : null;
+    return lastFu && lastFu.next && lastFu.next <= todayStr() && w.status!=='completed';
+  });
+  document.getElementById('fu-count').textContent = dueFollowups.length || '';
+
+  const main = document.getElementById('main');
+  if(currentTab==='dashboard') return renderDashboard(main);
+  if(currentTab==='clients') return renderClients(main);
+  if(currentTab==='work') return renderWork(main);
+  if(currentTab==='followups') return renderFollowups(main);
+  if(currentTab==='files') return renderFiles(main);
+  if(currentTab==='search') return renderSearch(main);
+}
+
+/* ---------- dashboard ---------- */
+function renderDashboard(main){
+  const counts = {completed:0, documents:0, in_progress:0, follow_up:0};
+  workItems.forEach(w=>{ if(counts[w.status]!==undefined) counts[w.status]++; });
+
+  const today = todayStr();
+  const dueToday = workItems.filter(w=>{
+    const lastFu = w.followups && w.followups.length ? w.followups[w.followups.length-1] : null;
+    const fuDue = lastFu && lastFu.next === today;
+    const dateDue = w.dueDate === today;
+    return (fuDue || dateDue) && w.status!=='completed';
+  });
+  const overdueFollowups = workItems.filter(w=>{
+    const lastFu = w.followups && w.followups.length ? w.followups[w.followups.length-1] : null;
+    return lastFu && lastFu.next && lastFu.next < today && w.status!=='completed';
+  });
+  const docsPending = workItems.filter(w=>w.status==='documents');
+  const inProgress = workItems.filter(w=>w.status==='in_progress' && !dueToday.includes(w));
+
+  main.innerHTML = `
+    <h1>Good morning — today's GST work</h1>
+    <div class="page-sub">${new Date().toLocaleDateString('en-IN',{weekday:'long', day:'numeric', month:'long', year:'numeric'})} · ${clients.length} clients on file</div>
+
+    <div class="stat-row">
+      <div class="stat completed"><div class="n">${counts.completed}</div><div class="l">Completed</div></div>
+      <div class="stat documents"><div class="n">${counts.documents}</div><div class="l">Documents Pending</div></div>
+      <div class="stat progress"><div class="n">${counts.in_progress}</div><div class="l">In Progress</div></div>
+      <div class="stat followup"><div class="n">${counts.follow_up}</div><div class="l">Follow-ups Due</div></div>
+    </div>
+
+    <div class="section-title">Urgent — overdue follow-up (${overdueFollowups.length})</div>
+    ${renderWorkTable(overdueFollowups)}
+
+    <div class="section-title">Due today (${dueToday.length})</div>
+    ${renderWorkTable(dueToday)}
+
+    <div class="section-title">Documents to collect (${docsPending.length})</div>
+    ${renderWorkTable(docsPending)}
+
+    <div class="section-title">Applications in process (${inProgress.length})</div>
+    ${renderWorkTable(inProgress)}
+  `;
+  attachWorkRowHandlers(main);
+}
+
+function renderWorkTable(items){
+  if(!items.length) return '<div class="empty">Nothing here.</div>';
+  let rows = items.map(w=>{
+    const c = clients.find(c=>c.id===w.clientId);
+    const lastFu = w.followups && w.followups.length ? w.followups[w.followups.length-1] : null;
+    return `<tr class="clickable" data-work="${w.id}">
+      <td>${c ? c.legalName : '—'}</td>
+      <td>${w.type}</td>
+      <td><span class="badge ${w.status}">${STATUS_LABEL[w.status]}</span></td>
+      <td>${w.dueDate ? fmtDate(w.dueDate) : (lastFu && lastFu.next ? 'Follow-up '+fmtDate(lastFu.next) : '—')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card"><table><thead><tr><th>Client</th><th>Work</th><th>Status</th><th>Due / Next</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function attachWorkRowHandlers(main){
+  main.querySelectorAll('tr[data-work]').forEach(tr=>{
+    tr.addEventListener('click', ()=> openWorkModal(tr.dataset.work));
+  });
+}
+
+/* ---------- clients ---------- */
+function renderClients(main){
+  main.innerHTML = `
+    <div class="topbar">
+      <div><h1>Clients</h1><div class="page-sub">${clients.length} clients on file</div></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn secondary" id="import-client-btn">Import Excel/CSV</button>
+        <button class="btn" id="add-client-btn">+ Add Client</button>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Client</th><th>GSTIN</th><th>State</th><th>Staff</th><th>Open Work</th></tr></thead>
+        <tbody id="clients-tbody"></tbody>
+      </table>
+    </div>
+  `;
+  const tbody = document.getElementById('clients-tbody');
+  if(!clients.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No clients yet. Add your first client, or import your list from Excel/CSV.</td></tr>`;
+  } else {
+    tbody.innerHTML = clients.map(c=>{
+      const open = workItems.filter(w=>w.clientId===c.id && w.status!=='completed').length;
+      return `<tr class="clickable" data-client="${c.id}">
+        <td>${c.legalName}${c.tradeName ? ' <span style="color:var(--slate-light)">('+c.tradeName+')</span>' : ''}</td>
+        <td class="mono">${c.gstin||'—'}</td>
+        <td>${c.state||'—'}</td>
+        <td>${c.staff||'—'}</td>
+        <td>${open}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('add-client-btn').addEventListener('click', ()=>openClientModal());
+  document.getElementById('import-client-btn').addEventListener('click', ()=>openImportModal());
+  tbody.querySelectorAll('tr[data-client]').forEach(tr=>{
+    tr.addEventListener('click', ()=>openClientModal(tr.dataset.client));
+  });
+}
+
+function openClientModal(clientId){
+  const c = clientId ? clients.find(x=>x.id===clientId) : null;
+  const bg = document.createElement('div');
+  bg.className='modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <span class="close">&times;</span>
+      <h2>${c ? 'Edit Client' : 'Add Client'}</h2>
+      <div class="page-sub">Client master details</div>
+      <div class="field-row">
+        <div class="field"><label>Legal Name</label><input id="f-legal" value="${c?c.legalName:''}"></div>
+        <div class="field"><label>Trade Name</label><input id="f-trade" value="${c?c.tradeName||'':''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>GSTIN</label><input id="f-gstin" class="mono" value="${c?c.gstin||'':''}"></div>
+        <div class="field"><label>PAN</label><input id="f-pan" class="mono" value="${c?c.pan||'':''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>State</label><input id="f-state" value="${c?c.state||'':''}"></div>
+        <div class="field"><label>Constitution</label><input id="f-const" placeholder="Proprietorship / Partnership / Pvt Ltd..." value="${c?c.constitution||'':''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Registration Date</label><input id="f-regdate" type="date" value="${c?c.regDate||'':''}"></div>
+        <div class="field"><label>Assigned Staff</label><input id="f-staff" value="${c?c.staff||'':''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Contact Person</label><input id="f-contact" value="${c?c.contact||'':''}"></div>
+        <div class="field"><label>Mobile</label><input id="f-mobile" value="${c?c.mobile||'':''}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Email</label><input id="f-email" value="${c?c.email||'':''}"></div>
+        <div class="field"><label>GST Portal Username</label><input id="f-gstuser" value="${c?c.gstUsername||'':''}"></div>
+      </div>
+      <div class="field"><label>GST Portal Password</label><input id="f-gstpw" type="password" value="${c?c.gstPassword||'':''}" placeholder="Stored encrypted, same as everything else in this file"></div>
+      <div class="field"><label>Remarks</label><textarea id="f-remarks" rows="2">${c?c.remarks||'':''}</textarea></div>
+      <div style="display:flex; justify-content:space-between; margin-top:16px;">
+        <div>${c ? '<button class="btn danger" id="del-client">Delete Client</button>' : '<span></span>'}</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" id="cancel-client">Cancel</button>
+          <button class="btn" id="save-client">${c?'Save Changes':'Add Client'}</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('.close').addEventListener('click', ()=>bg.remove());
+  bg.querySelector('#cancel-client').addEventListener('click', ()=>bg.remove());
+  if(c){
+    bg.querySelector('#del-client').addEventListener('click', async ()=>{
+      if(!confirm('Delete '+c.legalName+'? This will also remove their work items.')) return;
+      clients = clients.filter(x=>x.id!==c.id);
+      workItems = workItems.filter(w=>w.clientId!==c.id);
+      await saveClients(); await saveWork();
+      bg.remove(); render(); toast('Client deleted');
+    });
+  }
+  bg.querySelector('#save-client').addEventListener('click', async ()=>{
+    const legalName = document.getElementById('f-legal').value.trim();
+    if(!legalName){ toast('Legal name is required'); return; }
+    const data = {
+      legalName,
+      tradeName: document.getElementById('f-trade').value.trim(),
+      gstin: document.getElementById('f-gstin').value.trim().toUpperCase(),
+      pan: document.getElementById('f-pan').value.trim().toUpperCase(),
+      state: document.getElementById('f-state').value.trim(),
+      constitution: document.getElementById('f-const').value.trim(),
+      regDate: document.getElementById('f-regdate').value,
+      staff: document.getElementById('f-staff').value.trim(),
+      contact: document.getElementById('f-contact').value.trim(),
+      mobile: document.getElementById('f-mobile').value.trim(),
+      email: document.getElementById('f-email').value.trim(),
+      gstUsername: document.getElementById('f-gstuser').value.trim(),
+      gstPassword: document.getElementById('f-gstpw').value,
+      remarks: document.getElementById('f-remarks').value.trim(),
+    };
+    if(c){ Object.assign(c, data); }
+    else { clients.push({id:uid(), ...data}); }
+    await saveClients();
+    bg.remove(); render(); toast(c?'Client updated':'Client added');
+  });
+}
+
+/* ---------- excel/csv import ---------- */
+const FIELD_TARGETS = [
+  {key:'legalName', label:'Legal Name', required:true},
+  {key:'tradeName', label:'Trade Name'},
+  {key:'gstin', label:'GSTIN'},
+  {key:'pan', label:'PAN'},
+  {key:'state', label:'State'},
+  {key:'constitution', label:'Constitution'},
+  {key:'regDate', label:'Registration Date'},
+  {key:'staff', label:'Assigned Staff'},
+  {key:'contact', label:'Contact Person'},
+  {key:'mobile', label:'Mobile'},
+  {key:'email', label:'Email'},
+  {key:'gstUsername', label:'GST Portal Username'},
+  {key:'remarks', label:'Remarks'},
+  {key:'', label:"— Don't import —"}
+];
+function guessField(header){
+  const h = header.toLowerCase().trim();
+  if(h.includes('legal') || h==='name' || h.includes('client name')) return 'legalName';
+  if(h.includes('trade')) return 'tradeName';
+  if(h.includes('gstin')) return 'gstin';
+  if(h.includes('pan')) return 'pan';
+  if(h.includes('state')) return 'state';
+  if(h.includes('constitution')) return 'constitution';
+  if(h.includes('reg') && h.includes('date')) return 'regDate';
+  if(h.includes('staff')) return 'staff';
+  if(h.includes('contact')) return 'contact';
+  if(h.includes('mobile') || h.includes('phone')) return 'mobile';
+  if(h.includes('email')) return 'email';
+  if(h.includes('username') || h.includes('login')) return 'gstUsername';
+  if(h.includes('remark') || h.includes('note')) return 'remarks';
+  return '';
+}
+function openImportModal(){
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:720px;">
+      <span class="close">&times;</span>
+      <h2>Import Clients</h2>
+      <div class="page-sub">Upload an Excel (.xlsx) or CSV file with your client list. The file itself is also saved to your Files library.</div>
+      <div class="field" style="margin-top:14px;"><input type="file" id="import-file" accept=".xlsx,.xls,.csv"></div>
+      <div id="import-preview"></div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('.close').addEventListener('click', ()=>bg.remove());
+  document.getElementById('import-file').addEventListener('change', handleImportFile);
+}
+let importRows = [];
+let importHeaders = [];
+let importFileMeta = null;
+function handleImportFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  importFileMeta = {name:file.name, size:file.size};
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      if(!rows.length){ toast('File appears empty'); return; }
+      importHeaders = rows[0].map(h=>String(h));
+      importRows = rows.slice(1).filter(r=>r.some(cell=>String(cell).trim()!==''));
+      importFileMeta.base64 = arrayBufferToBase64(evt.target.result);
+      renderImportPreview();
+    }catch(err){
+      toast('Could not read that file: ' + (err && err.message ? err.message : ''));
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function arrayBufferToBase64(buf){
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  return btoa(binary);
+}
+function renderImportPreview(){
+  const guesses = importHeaders.map(guessField);
+  const preview = document.getElementById('import-preview');
+  preview.innerHTML = `
+    <div class="section-title">Match columns (${importRows.length} rows found)</div>
+    <table><thead><tr>${importHeaders.map((h,i)=>`<th>${h||'(col '+(i+1)+')'}</th>`).join('')}</tr></thead>
+    <tbody><tr>${importHeaders.map((h,i)=>`
+      <td><select class="col-map" data-col="${i}">
+        ${FIELD_TARGETS.map(f=>`<option value="${f.key}" ${f.key===guesses[i]?'selected':''}>${f.label}</option>`).join('')}
+      </select></td>`).join('')}</tr>
+    ${importRows.slice(0,3).map(r=>`<tr>${importHeaders.map((h,i)=>`<td style="color:var(--slate);font-size:12px;">${r[i]!==undefined?r[i]:''}</td>`).join('')}</tr>`).join('')}
+    </tbody></table>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+      <button class="btn secondary" id="cancel-import">Cancel</button>
+      <button class="btn" id="confirm-import">Import ${importRows.length} Clients</button>
+    </div>
+  `;
+  document.getElementById('cancel-import').addEventListener('click', ()=>document.querySelector('.modal-bg').remove());
+  document.getElementById('confirm-import').addEventListener('click', doImport);
+}
+async function doImport(){
+  const mapping = {};
+  document.querySelectorAll('.col-map').forEach(sel=>{
+    if(sel.value) mapping[parseInt(sel.dataset.col)] = sel.value;
+  });
+  let added = 0, skipped = 0;
+  importRows.forEach(row=>{
+    const rec = {};
+    Object.keys(mapping).forEach(colIdx=>{
+      const key = mapping[colIdx];
+      let val = row[colIdx] !== undefined ? String(row[colIdx]).trim() : '';
+      if(key==='gstin' || key==='pan') val = val.toUpperCase();
+      rec[key] = val;
+    });
+    if(!rec.legalName){ skipped++; return; }
+    clients.push({id: uid(), legalName:'', tradeName:'', gstin:'', pan:'', state:'', constitution:'', regDate:'', staff:'', contact:'', mobile:'', email:'', gstUsername:'', gstPassword:'', remarks:'', ...rec});
+    added++;
+  });
+  if(importFileMeta && importFileMeta.base64){
+    files.push({id:uid(), name:importFileMeta.name, size:importFileMeta.size, date:todayStr(), base64:importFileMeta.base64});
+  }
+  await saveClients();
+  document.querySelector('.modal-bg').remove();
+  render();
+  toast(`Imported ${added} clients${skipped?', skipped '+skipped+' with no name':''}`);
+}
+
+/* ---------- files library ---------- */
+function renderFiles(main){
+  main.innerHTML = `
+    <h1>Files</h1>
+    <div class="page-sub">Excel/CSV files you've uploaded, kept here for reference — encrypted along with everything else</div>
+    <div class="dropzone" id="dropzone" style="margin-bottom:20px;">
+      Click to upload, or drag an Excel/CSV file here
+      <input type="file" id="files-input" accept=".xlsx,.xls,.csv" style="display:none;">
+    </div>
+    <div class="card" id="files-card"></div>
+  `;
+  const card = document.getElementById('files-card');
+  if(!files.length){
+    card.innerHTML = '<div class="empty">No files uploaded yet.</div>';
+  } else {
+    card.innerHTML = files.slice().reverse().map(f=>`
+      <div class="file-row">
+        <div>
+          <div class="file-name">${f.name}</div>
+          <div class="file-meta">${fmtSize(f.size)} · uploaded ${fmtDate(f.date)}</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn small secondary" data-dl="${f.id}">Download</button>
+          <button class="btn small danger" data-del="${f.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    card.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click', ()=>downloadFile(b.dataset.dl)));
+    card.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>deleteFile(b.dataset.del)));
+  }
+
+  const dz = document.getElementById('dropzone');
+  const input = document.getElementById('files-input');
+  dz.addEventListener('click', ()=>input.click());
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    if(e.dataTransfer.files.length) storeRawFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', e=>{
+    if(e.target.files.length) storeRawFile(e.target.files[0]);
+  });
+}
+function storeRawFile(file){
+  const reader = new FileReader();
+  reader.onload = async (evt)=>{
+    files.push({id:uid(), name:file.name, size:file.size, date:todayStr(), base64:arrayBufferToBase64(evt.target.result)});
+    await saveFiles();
+    render();
+    toast('File uploaded — you can import it as clients from the Clients tab');
+  };
+  reader.readAsArrayBuffer(file);
+}
+function downloadFile(id){
+  const f = files.find(x=>x.id===id);
+  if(!f) return;
+  const link = document.createElement('a');
+  link.href = 'data:application/octet-stream;base64,'+f.base64;
+  link.download = f.name;
+  link.click();
+}
+async function deleteFile(id){
+  if(!confirm('Delete this file?')) return;
+  files = files.filter(x=>x.id!==id);
+  await saveFiles();
+  render();
+  toast('File deleted');
+}
+
+/* ---------- work tracker ---------- */
+let workFilter = 'all';
+function renderWork(main){
+  main.innerHTML = `
+    <div class="topbar">
+      <div><h1>Work Tracker</h1><div class="page-sub">${workItems.length} work items across all clients</div></div>
+      <button class="btn" id="add-work-btn" ${clients.length?'':'disabled'}>+ New Work Item</button>
+    </div>
+    ${clients.length?'':'<div class="empty">Add a client first before creating work items.</div>'}
+    <div class="tag-row" id="work-filters">
+      ${['all','documents','in_progress','follow_up','completed'].map(s=>`<div class="tag ${workFilter===s?'active':''}" data-status="${s}">${s==='all'?'All':STATUS_LABEL[s]}</div>`).join('')}
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Client</th><th>Category</th><th>Work</th><th>Status</th><th>Due</th></tr></thead>
+        <tbody id="work-tbody"></tbody>
+      </table>
+    </div>
+  `;
+  renderWorkRows();
+  document.getElementById('add-work-btn').addEventListener('click', ()=>openWorkModal());
+  main.querySelectorAll('#work-filters .tag').forEach(t=>{
+    t.addEventListener('click', ()=>{ workFilter = t.dataset.status; renderWork(main); });
+  });
+}
+function renderWorkRows(){
+  const tbody = document.getElementById('work-tbody');
+  const items = workFilter==='all' ? workItems : workItems.filter(w=>w.status===workFilter);
+  if(!items.length){ tbody.innerHTML = `<tr><td colspan="5" class="empty">No work items here.</td></tr>`; return; }
+  tbody.innerHTML = items.map(w=>{
+    const c = clients.find(c=>c.id===w.clientId);
+    return `<tr class="clickable" data-work="${w.id}">
+      <td>${c?c.legalName:'—'}</td>
+      <td>${w.category}</td>
+      <td>${w.type}</td>
+      <td><span class="badge ${w.status}">${STATUS_LABEL[w.status]}</span></td>
+      <td>${w.dueDate?fmtDate(w.dueDate):'—'}</td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('tr[data-work]').forEach(tr=>{
+    tr.addEventListener('click', ()=>openWorkModal(tr.dataset.work));
+  });
+}
+
+function openWorkModal(workId){
+  const w = workId ? workItems.find(x=>x.id===workId) : null;
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+
+  if(!w){
+    bg.innerHTML = `
+      <div class="modal">
+        <span class="close">&times;</span>
+        <h2>New Work Item</h2>
+        <div class="field"><label>Client</label>
+          <select id="nw-client">${clients.map(c=>`<option value="${c.id}">${c.legalName}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Category</label>
+          <select id="nw-category">${Object.keys(WORK_CATEGORIES).map(cat=>`<option value="${cat}">${cat}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Work Type</label>
+          <select id="nw-type"></select>
+        </div>
+        <div class="field"><label>Due Date (optional)</label><input id="nw-due" type="date"></div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+          <button class="btn secondary" id="cancel-nw">Cancel</button>
+          <button class="btn" id="create-nw">Create Work Item</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(bg);
+    const catSel = document.getElementById('nw-category');
+    const typeSel = document.getElementById('nw-type');
+    function fillTypes(){ typeSel.innerHTML = WORK_CATEGORIES[catSel.value].map(t=>`<option value="${t}">${t}</option>`).join(''); }
+    fillTypes();
+    catSel.addEventListener('change', fillTypes);
+    bg.querySelector('.close').addEventListener('click', ()=>bg.remove());
+    bg.querySelector('#cancel-nw').addEventListener('click', ()=>bg.remove());
+    bg.querySelector('#create-nw').addEventListener('click', async ()=>{
+      const type = typeSel.value;
+      const checklist = (CHECKLISTS[type]||["Prepare application","Submit application","Track application","Save order/certificate"]).map(t=>({text:t, done:false}));
+      const item = {
+        id: uid(),
+        clientId: document.getElementById('nw-client').value,
+        category: catSel.value,
+        type,
+        status: 'documents',
+        dueDate: document.getElementById('nw-due').value,
+        createdDate: todayStr(),
+        checklist,
+        followups: []
+      };
+      workItems.push(item);
+      await saveWork();
+      bg.remove();
+      render();
+      openWorkModal(item.id);
+      toast('Work item created');
+    });
+    return;
+  }
+
+  const c = clients.find(c=>c.id===w.clientId);
+  bg.innerHTML = `
+    <div class="modal">
+      <span class="close">&times;</span>
+      <h2>${w.type}</h2>
+      <div class="page-sub">${c?c.legalName:'Unknown client'} · ${w.category}</div>
+
+      <div class="field-row" style="margin-top:14px;">
+        <div class="field"><label>Status</label>
+          <select id="wm-status">
+            ${Object.keys(STATUS_LABEL).map(s=>`<option value="${s}" ${w.status===s?'selected':''}>${STATUS_LABEL[s]}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>Due Date</label><input id="wm-due" type="date" value="${w.dueDate||''}"></div>
+      </div>
+
+      <div class="section-title">Checklist</div>
+      <div id="wm-checklist">
+        ${w.checklist.map((item,i)=>`
+          <div class="checklist-item ${item.done?'done':''}">
+            <input type="checkbox" id="chk-${i}" ${item.done?'checked':''} data-idx="${i}">
+            <label for="chk-${i}">${item.text}</label>
+          </div>`).join('')}
+      </div>
+
+      <div class="section-title">Follow-up log</div>
+      <div class="followup-log" id="wm-followups">
+        ${w.followups.length ? w.followups.map(f=>`
+          <div class="followup-entry">
+            <div class="fd">${fmtDate(f.date)}${f.next?' · next follow-up '+fmtDate(f.next):''}</div>
+            <div><strong>${f.action||''}</strong>${f.response?' — '+f.response:''}</div>
+          </div>`).join('') : '<div class="empty" style="padding:8px 0;">No follow-ups logged.</div>'}
+      </div>
+      <div class="field-row" style="margin-top:8px;">
+        <div class="field"><label>Action taken</label><input id="fu-action" placeholder="e.g. Called officer"></div>
+        <div class="field"><label>Response</label><input id="fu-response" placeholder="e.g. Asked to resubmit KYC"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Next follow-up date</label><input id="fu-next" type="date"></div>
+        <div class="field" style="display:flex; align-items:flex-end;"><button class="btn secondary" id="add-fu" style="width:100%;">Add Follow-up</button></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:18px;">
+        <button class="btn danger" id="del-work">Delete Work Item</button>
+        <button class="btn" id="close-work">Done</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bg);
+  bg.querySelector('.close').addEventListener('click', ()=>bg.remove());
+  bg.querySelector('#close-work').addEventListener('click', ()=>{ bg.remove(); render(); });
+
+  bg.querySelectorAll('#wm-checklist input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const idx = parseInt(cb.dataset.idx);
+      w.checklist[idx].done = cb.checked;
+      cb.closest('.checklist-item').classList.toggle('done', cb.checked);
+      await saveWork();
+    });
+  });
+
+  bg.querySelector('#wm-status').addEventListener('change', async (e)=>{
+    w.status = e.target.value;
+    await saveWork();
+  });
+  bg.querySelector('#wm-due').addEventListener('change', async (e)=>{
+    w.dueDate = e.target.value;
+    await saveWork();
+  });
+
+  bg.querySelector('#add-fu').addEventListener('click', async ()=>{
+    const action = document.getElementById('fu-action').value.trim();
+    const response = document.getElementById('fu-response').value.trim();
+    const next = document.getElementById('fu-next').value;
+    if(!action){ toast('Enter what action was taken'); return; }
+    w.followups.push({date: todayStr(), action, response, next});
+    if(w.status !== 'completed') w.status = next ? 'follow_up' : w.status;
+    await saveWork();
+    bg.remove();
+    openWorkModal(w.id);
+    toast('Follow-up logged');
+  });
+
+  bg.querySelector('#del-work').addEventListener('click', async ()=>{
+    if(!confirm('Delete this work item?')) return;
+    workItems = workItems.filter(x=>x.id!==w.id);
+    await saveWork();
+    bg.remove(); render(); toast('Work item deleted');
+  });
+}
+
+/* ---------- follow-ups tab ---------- */
+function renderFollowups(main){
+  const today = todayStr();
+  const withFu = workItems.filter(w=>w.followups && w.followups.length && w.status!=='completed');
+  const overdue = withFu.filter(w=>w.followups[w.followups.length-1].next && w.followups[w.followups.length-1].next < today);
+  const dueToday = withFu.filter(w=>w.followups[w.followups.length-1].next === today);
+  const upcoming = withFu.filter(w=>w.followups[w.followups.length-1].next && w.followups[w.followups.length-1].next > today);
+
+  main.innerHTML = `
+    <h1>Follow-ups</h1>
+    <div class="page-sub">Every open item with a logged follow-up</div>
+    <div class="section-title">Overdue (${overdue.length})</div>
+    ${renderWorkTable(overdue)}
+    <div class="section-title">Due today (${dueToday.length})</div>
+    ${renderWorkTable(dueToday)}
+    <div class="section-title">Upcoming (${upcoming.length})</div>
+    ${renderWorkTable(upcoming)}
+  `;
+  attachWorkRowHandlers(main);
+}
+
+/* ---------- search ---------- */
+function renderSearch(main){
+  main.innerHTML = `
+    <h1>Search</h1>
+    <div class="page-sub">Search by client name, GSTIN, PAN or mobile</div>
+    <div class="field search-box"><input id="search-input" placeholder="Type to search…" autofocus></div>
+    <div id="search-results" style="margin-top:18px;"></div>
+  `;
+  const input = document.getElementById('search-input');
+  input.addEventListener('input', ()=>doSearch(input.value.trim().toLowerCase()));
+  doSearch('');
+}
+function doSearch(q){
+  const results = document.getElementById('search-results');
+  if(!q){ results.innerHTML = '<div class="empty">Start typing to search clients and work items.</div>'; return; }
+  const matched = clients.filter(c=>
+    (c.legalName||'').toLowerCase().includes(q) ||
+    (c.tradeName||'').toLowerCase().includes(q) ||
+    (c.gstin||'').toLowerCase().includes(q) ||
+    (c.pan||'').toLowerCase().includes(q) ||
+    (c.mobile||'').includes(q)
+  );
+  if(!matched.length){ results.innerHTML = '<div class="empty">No matches.</div>'; return; }
+  results.innerHTML = matched.map(c=>{
+    const items = workItems.filter(w=>w.clientId===c.id);
+    return `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><strong>${c.legalName}</strong> <span class="mono" style="color:var(--slate);">${c.gstin||''}</span></div>
+          <button class="btn small secondary" data-edit-client="${c.id}">View / Edit</button>
+        </div>
+        ${items.length ? `<table style="margin-top:10px;"><tbody>${items.map(w=>`
+          <tr class="clickable" data-work="${w.id}"><td>${w.type}</td><td><span class="badge ${w.status}">${STATUS_LABEL[w.status]}</span></td></tr>
+        `).join('')}</tbody></table>` : '<div class="empty" style="padding:8px 0;">No work items yet.</div>'}
+      </div>`;
+  }).join('');
+  results.querySelectorAll('[data-edit-client]').forEach(b=>b.addEventListener('click', ()=>openClientModal(b.dataset.editClient)));
+  results.querySelectorAll('tr[data-work]').forEach(tr=>tr.addEventListener('click', ()=>openWorkModal(tr.dataset.work)));
+}
+
+/* ---------- init ---------- */
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
