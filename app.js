@@ -6,6 +6,13 @@ const MENU = [
   { group: 'Overview', items: [
     { id: 'dashboard', name: 'Dashboard' },
     { id: 'updates', name: 'Portal Updates' } ] },
+  { group: 'My Apps', items: [
+    { name: 'Billing App', href: 'Bill.html' },
+    { name: 'CS Office Manager', href: 'ASK.html' } ] },
+  { group: 'Official portals', items: [
+    { name: 'MCA / ROC', href: 'https://www.mca.gov.in' },
+    { name: 'GST Portal', href: 'https://www.gst.gov.in' },
+    { name: 'Income Tax', href: 'https://www.incometax.gov.in' } ] },
   { group: 'Clients', items: [
     { id: 'clients', name: 'Client Master', about: 'Companies and LLPs with CIN/LLPIN, directors, registered office and contacts.' } ] },
   { group: 'Compliance', items: [
@@ -19,8 +26,7 @@ const MENU = [
     { id: 'tm', name: 'Trademark', about: 'Applications, objections, hearings and renewals.' },
     { id: 'dpiit', name: 'DPIIT', about: 'Startup recognition applications and follow-ups.' } ] },
   { group: 'Finance', items: [
-    { id: 'loans', name: 'Loans and Reports', about: 'Loan documentation checklists and report generation.' },
-    { id: 'billing', name: 'Billing', about: 'Invoices, receipts and outstanding payments.' } ] },
+    { id: 'loans', name: 'Loans and Reports', about: 'Loan documentation checklists and report generation.' } ] },
   { group: 'Office', items: [
     { id: 'docs', name: 'Documents', about: 'Client-wise document storage and search.' },
     { id: 'tasks', name: 'Team Tasks', about: 'Assign work to team members with role-based access.' },
@@ -99,7 +105,7 @@ function pageModule(m) {
 }
 
 /* ---------- Router ---------- */
-const ALL = MENU.flatMap(g => g.items);
+const ALL = MENU.flatMap(g => g.items).filter(i => !i.href);
 const navEl = document.getElementById('nav');
 const viewEl = document.getElementById('view');
 const sidebar = document.getElementById('sidebar');
@@ -107,7 +113,9 @@ const scrim = document.getElementById('scrim');
 
 navEl.innerHTML = MENU.map(g =>
   `<div class="grp">${esc(g.group)}</div>` +
-  g.items.map(i => `<button class="nav-link" data-id="${i.id}">${esc(i.name)}</button>`).join('')
+  g.items.map(i => i.href
+    ? `<a class="nav-link" href="${esc(i.href)}" target="_blank" rel="noopener">${esc(i.name)} ↗</a>`
+    : `<button class="nav-link" data-id="${i.id}">${esc(i.name)}</button>`).join('')
 ).join('');
 
 function setMenu(open) { sidebar.classList.toggle('open', open); scrim.classList.toggle('show', open); }

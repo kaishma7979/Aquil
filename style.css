@@ -23,6 +23,7 @@ h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:700;margin:0;li
 .grp{margin:16px 20px 4px;font-size:13px;opacity:.65}
 .nav-link{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;font:inherit;
   padding:11px 20px;cursor:pointer;border-left:4px solid transparent}
+a.nav-link{text-decoration:none;box-sizing:border-box}
 .nav-link:hover{background:rgba(255,255,255,.08)}
 .nav-link.active{background:var(--deep-2);border-left-color:#e0a63a;font-weight:600}
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none}
