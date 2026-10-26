@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e4a5a">
+<title>Aquill – Aquatiis Legalisis</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="signed-out">
+<section id="login">
+  <div class="login-box">
+    <h1>Aquill</h1>
+    <p class="sub">Aquatiis Legalisis. Sign in to continue.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <p id="loginMsg" role="alert"></p>
+    <button id="signin" type="button">Sign in</button>
+  </div>
+</section>
+<div class="app">
+  <aside id="sidebar" class="sidebar" aria-label="Main menu">
+    <div class="brand"><strong>Aquill</strong><span>Aquatiis Legalisis</span></div>
+    <nav id="nav"></nav>
+  </aside>
+  <div id="scrim" class="scrim"></div>
+  <div class="main">
+    <header class="topbar">
+      <button id="menuBtn" class="menu-btn" aria-label="Open menu">☰</button>
+      <h1 id="pageTitle">Dashboard</h1>
+      <button id="signout" class="signout" type="button">Sign out</button>
+    </header>
+    <main id="view" tabindex="-1"></main>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+<script src="updates.js"></script>
+<script src="auth.js"></script>
+</body>
+</html>
