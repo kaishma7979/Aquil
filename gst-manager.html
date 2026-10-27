@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GST Client &amp; Compliance Manager</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <style>
   :root{
     --ink:#1B2A38;
@@ -171,10 +170,6 @@
     <div class="nav-item" data-tab="followups">Follow-ups <span class="count" id="fu-count"></span></div>
     <div class="nav-item" data-tab="files">Files</div>
     <div class="nav-item" data-tab="search">Search</div>
-    <div class="sidebar-footer">
-      <div class="sf-link" id="change-pw-link">Change password</div>
-      <div class="sf-link" id="lock-link">Lock now</div>
-    </div>
   </div>
   <div id="main"></div>
 </div>
@@ -182,24 +177,41 @@
 
 <script>
 /* =====================================================================
-   ENCRYPTION LAYER — uses CryptoJS (pure JavaScript) rather than the
-   browser's native Web Crypto API, because Web Crypto is unavailable
-   inside this sandboxed artifact frame. Everything (clients, work
-   items, uploaded files) is stored as one encrypted blob under a
-   single key. The password is kept only in memory for the session —
-   it is never itself written to storage.
+   STORAGE — saves everything in this browser (IndexedDB, with
+   localStorage as a fallback). No password. Data stays on this device;
+   use the backup/export options to copy it elsewhere.
 ===================================================================== */
-let sessionPassword = null;
-
-function encryptData(password, obj){
-  return CryptoJS.AES.encrypt(JSON.stringify(obj), password).toString();
-}
-function decryptData(password, cipherText){
-  const bytes = CryptoJS.AES.decrypt(cipherText, password);
-  const str = bytes.toString(CryptoJS.enc.Utf8);
-  if(!str) throw new Error('Incorrect password');
-  return JSON.parse(str);
-}
+(function(){
+  const DB='gst-manager-db', STORE='kv';
+  function openDB(){
+    return new Promise((res,rej)=>{
+      if(!window.indexedDB) return rej(new Error('no indexedDB'));
+      const r=indexedDB.open(DB,1);
+      r.onupgradeneeded=()=>r.result.createObjectStore(STORE);
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>rej(r.error);
+    });
+  }
+  async function idbGet(k){
+    const db=await openDB();
+    return new Promise((res,rej)=>{const q=db.transaction(STORE).objectStore(STORE).get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});
+  }
+  async function idbSet(k,v){
+    const db=await openDB();
+    return new Promise((res,rej)=>{const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).put(v,k);t.oncomplete=()=>res(true);t.onerror=()=>rej(t.error);});
+  }
+  window.storage={
+    async get(k){
+      let v; try{ v=await idbGet(k); }catch(e){ v=localStorage.getItem('gstm:'+k); }
+      return (v===undefined||v===null)?null:{key:k,value:v};
+    },
+    async set(k,v){
+      try{ await idbSet(k,v); }catch(e){ localStorage.setItem('gstm:'+k,v); }
+      return {key:k,value:v};
+    }
+  };
+  if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
+})();
 
 /* ---------- state ---------- */
 let clients = [];
@@ -209,9 +221,8 @@ let currentTab = 'dashboard';
 
 async function persist(){
   try{
-    const cipherText = encryptData(sessionPassword, {clients, workItems, files});
-    const result = await window.storage.set('vault', cipherText, false);
-    if(!result) toast('Save failed — check your connection and try again');
+    const result = await window.storage.set('vault', JSON.stringify({clients, workItems, files}));
+    if(!result) toast('Save failed — please try again');
   }catch(e){
     toast('Could not save: ' + (e && e.message ? e.message : 'unknown error'));
   }
@@ -267,143 +278,35 @@ const WORK_CATEGORIES = {
 const STATUS_LABEL = {documents:"Documents Pending", in_progress:"In Progress", follow_up:"Follow-up", completed:"Completed"};
 
 /* =====================================================================
-   LOCK SCREEN
+   START-UP (no password)
 ===================================================================== */
 async function boot(){
   const lockEl = document.getElementById('lock-screen');
   const appEl = document.getElementById('app');
-  lockEl.style.display = 'flex';
-  appEl.style.display = 'none';
-
-  if(typeof CryptoJS === 'undefined'){
-    lockEl.innerHTML = `<div class="lock-card"><h2>Couldn't load</h2><div class="page-sub">A required library failed to load. Check your internet connection and reload this page.</div></div>`;
-    return;
-  }
-
-  let existingVault = null;
+  let raw = null;
   try{
-    const v = await window.storage.get('vault', false);
-    existingVault = v ? v.value : null;
-  }catch(e){
-    existingVault = null;
-  }
+    const v = await window.storage.get('vault');
+    raw = v ? v.value : null;
+  }catch(e){ raw = null; }
 
-  if(!existingVault){
-    renderCreatePassword(lockEl, appEl);
-  } else {
-    renderUnlock(lockEl, appEl, existingVault);
-  }
-}
-
-function renderCreatePassword(lockEl, appEl){
-  lockEl.innerHTML = `
-    <div class="lock-card">
-      <h2>Set a password</h2>
-      <div class="page-sub">This protects your client data (GSTIN, PAN, contacts) on this device. There's no way to recover it if you forget it — write it down somewhere safe.</div>
-      <div class="field"><label>Password</label><input type="password" id="pw1" autofocus></div>
-      <div class="field"><label>Confirm password</label><input type="password" id="pw2"></div>
-      <div class="lock-error" id="pw-error"></div>
-      <button class="btn" id="create-pw-btn" style="width:100%;">Set Password &amp; Continue</button>
-    </div>
-  `;
-  const go = async ()=>{
-    const err = document.getElementById('pw-error');
-    const btn = document.getElementById('create-pw-btn');
+  if(raw){
     try{
-      const p1 = document.getElementById('pw1').value;
-      const p2 = document.getElementById('pw2').value;
-      if(p1.length < 4){ err.textContent = 'Use at least 4 characters.'; return; }
-      if(p1 !== p2){ err.textContent = "Passwords don't match."; return; }
-      btn.disabled = true; btn.textContent = 'Setting up…';
-      sessionPassword = p1;
-      clients = []; workItems = []; files = [];
-      const cipherText = encryptData(sessionPassword, {clients, workItems, files});
-      const result = await window.storage.set('vault', cipherText, false);
-      if(!result) throw new Error('storage did not confirm the save');
-      lockEl.style.display = 'none';
-      appEl.style.display = 'flex';
-      currentTab = 'dashboard';
-      render();
-    }catch(e){
-      err.textContent = 'Something went wrong: ' + (e && e.message ? e.message : 'unknown error');
-      btn.disabled = false; btn.textContent = 'Set Password & Continue';
-    }
-  };
-  document.getElementById('create-pw-btn').addEventListener('click', go);
-  lockEl.querySelector('#pw2').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
-}
-
-function renderUnlock(lockEl, appEl, vaultCipherText){
-  lockEl.innerHTML = `
-    <div class="lock-card">
-      <h2>Enter password</h2>
-      <div class="page-sub">Unlock your GST client data</div>
-      <div class="field"><label>Password</label><input type="password" id="unlock-pw" autofocus></div>
-      <div class="lock-error" id="unlock-error"></div>
-      <button class="btn" id="unlock-btn" style="width:100%;">Unlock</button>
-    </div>
-  `;
-  const go = async ()=>{
-    const err = document.getElementById('unlock-error');
-    err.textContent = '';
-    try{
-      const pw = document.getElementById('unlock-pw').value;
-      const parsed = decryptData(pw, vaultCipherText);
+      const parsed = JSON.parse(raw);
       clients = parsed.clients || [];
       workItems = parsed.workItems || [];
       files = parsed.files || [];
-      sessionPassword = pw;
-      lockEl.style.display = 'none';
-      appEl.style.display = 'flex';
-      currentTab = 'dashboard';
-      render();
     }catch(e){
-      err.textContent = 'Incorrect password.';
+      lockEl.style.display = 'flex';
+      appEl.style.display = 'none';
+      lockEl.innerHTML = '<div class="lock-card"><h2>Saved data could not be read</h2><div class="page-sub">Nothing has been changed. Please contact support before adding new data.</div></div>';
+      return;
     }
-  };
-  document.getElementById('unlock-btn').addEventListener('click', go);
-  lockEl.querySelector('#unlock-pw').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+  }
+  lockEl.style.display = 'none';
+  appEl.style.display = 'flex';
+  currentTab = 'dashboard';
+  render();
 }
-
-/* change password / lock */
-document.getElementById('change-pw-link').addEventListener('click', ()=>{
-  const bg = document.createElement('div');
-  bg.className = 'modal-bg';
-  bg.innerHTML = `
-    <div class="modal" style="max-width:400px;">
-      <span class="close">&times;</span>
-      <h2>Change password</h2>
-      <div class="page-sub">Re-encrypts your data with a new password.</div>
-      <div class="field"><label>New password</label><input type="password" id="new-pw1"></div>
-      <div class="field"><label>Confirm new password</label><input type="password" id="new-pw2"></div>
-      <div class="lock-error" id="cpw-error"></div>
-      <button class="btn" id="save-new-pw" style="width:100%;">Save New Password</button>
-    </div>
-  `;
-  document.body.appendChild(bg);
-  bg.querySelector('.close').addEventListener('click', ()=>bg.remove());
-  bg.querySelector('#save-new-pw').addEventListener('click', async ()=>{
-    const err = document.getElementById('cpw-error');
-    try{
-      const p1 = document.getElementById('new-pw1').value;
-      const p2 = document.getElementById('new-pw2').value;
-      if(p1.length < 4){ err.textContent='Use at least 4 characters.'; return; }
-      if(p1 !== p2){ err.textContent="Passwords don't match."; return; }
-      sessionPassword = p1;
-      await persist();
-      bg.remove();
-      toast('Password updated');
-    }catch(e){
-      err.textContent = 'Something went wrong: ' + (e && e.message ? e.message : 'unknown error');
-    }
-  });
-});
-document.getElementById('lock-link').addEventListener('click', ()=>{
-  sessionPassword = null;
-  clients = []; workItems = []; files = [];
-  document.getElementById('app').style.display = 'none';
-  boot();
-});
 
 /* ---------- nav ---------- */
 document.querySelectorAll('.nav-item').forEach(el=>{
