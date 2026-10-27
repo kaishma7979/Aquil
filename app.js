@@ -8,7 +8,8 @@ const MENU = [
     { id: 'updates', name: 'Portal Updates' } ] },
   { group: 'My Apps', items: [
     { name: 'Billing App', href: 'Bill.html' },
-    { name: 'CS Office Manager', href: 'ASK.html' } ] },
+    { name: 'CS Office Manager', href: 'ASK.html' },
+    { name: 'GST Manager', href: 'gst-manager.html' } ] },
   { group: 'Official portals', items: [
     { name: 'MCA / ROC', href: 'https://www.mca.gov.in' },
     { name: 'GST Portal', href: 'https://www.gst.gov.in' },
