@@ -470,7 +470,7 @@ function openClientModal(clientId){
         <div class="field"><label>Email</label><input id="f-email" value="${c?c.email||'':''}"></div>
         <div class="field"><label>GST Portal Username</label><input id="f-gstuser" value="${c?c.gstUsername||'':''}"></div>
       </div>
-      <div class="field"><label>GST Portal Password</label><input id="f-gstpw" type="password" value="${c?c.gstPassword||'':''}" placeholder="Stored encrypted, same as everything else in this file"></div>
+      <div class="field"><label>GST Portal Password</label><input id="f-gstpw" type="password" value="${c?c.gstPassword||'':''}" placeholder="Saved in this browser only, not encrypted"></div>
       <div class="field"><label>Remarks</label><textarea id="f-remarks" rows="2">${c?c.remarks||'':''}</textarea></div>
       <div style="display:flex; justify-content:space-between; margin-top:16px;">
         <div>${c ? '<button class="btn danger" id="del-client">Delete Client</button>' : '<span></span>'}</div>
@@ -653,7 +653,7 @@ async function doImport(){
 function renderFiles(main){
   main.innerHTML = `
     <h1>Files</h1>
-    <div class="page-sub">Excel/CSV files you've uploaded, kept here for reference — encrypted along with everything else</div>
+    <div class="page-sub">Excel/CSV files you've uploaded, kept here for reference — saved in this browser only</div>
     <div class="dropzone" id="dropzone" style="margin-bottom:20px;">
       Click to upload, or drag an Excel/CSV file here
       <input type="file" id="files-input" accept=".xlsx,.xls,.csv" style="display:none;">
